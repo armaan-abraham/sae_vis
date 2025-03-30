@@ -39,7 +39,18 @@ sae_vis_data = SaeVisData.create(
     cfg=SaeVisConfig(features=range(128)),  # 256
     verbose=True,
 )
-sae_vis_data.save_feature_centric_vis(filename="demo_feature_vis.html", feature=8)
+
+# %%
+
+print("1")
+
+# %%
+
+print("Bla:", sae_vis_data.feature_data_dict.keys())
+print("Bla2", sae_vis_data.feature_data_dict[8])
+
+# %%
+sae_vis_data.save_feature_centric_vis(filename="demo_feature_vis.html", feature=0)
 
 # %%
 
