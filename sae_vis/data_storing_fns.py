@@ -908,6 +908,7 @@ class SaeVisData:
         assert isinstance(feature, int)
 
         all_feature_data = list(self.feature_data_dict.items())
+        print("all feature data:", self.feature_data_dict.keys())
         if verbose:
             all_feature_data = tqdm(all_feature_data, desc="Saving feature-centric vis")
 

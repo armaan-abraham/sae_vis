@@ -131,20 +131,20 @@ def parse_feature_data(
         # Store kwargs (makes it easier to turn the tables on and off individually)
         feature_tables_data = {}
 
-        # Table 1: neuron alignment, based on decoder weights
-        if layout.feature_tables_cfg.neuron_alignment_table:
-            top3_neurons_aligned = TopK(
-                tensor=feature_out_dir, k=layout.feature_tables_cfg.n_rows, largest=True
-            )
-            feature_out_l1_norm = feature_out_dir.abs().sum(dim=-1, keepdim=True)
-            pct_of_l1: Arr = np.absolute(top3_neurons_aligned.values) / utils.to_numpy(
-                feature_out_l1_norm
-            )
-            feature_tables_data.update(
-                neuron_alignment_indices=top3_neurons_aligned.indices.tolist(),
-                neuron_alignment_values=top3_neurons_aligned.values.tolist(),
-                neuron_alignment_l1=pct_of_l1.tolist(),
-            )
+        # # Table 1: neuron alignment, based on decoder weights
+        # if layout.feature_tables_cfg.neuron_alignment_table:
+        #     top3_neurons_aligned = TopK(
+        #         tensor=feature_out_dir, k=layout.feature_tables_cfg.n_rows, largest=True
+        #     )
+        #     feature_out_l1_norm = feature_out_dir.abs().sum(dim=-1, keepdim=True)
+        #     pct_of_l1: Arr = np.absolute(top3_neurons_aligned.values) / utils.to_numpy(
+        #         feature_out_l1_norm
+        #     )
+        #     feature_tables_data.update(
+        #         neuron_alignment_indices=top3_neurons_aligned.indices.tolist(),
+        #         neuron_alignment_values=top3_neurons_aligned.values.tolist(),
+        #         neuron_alignment_l1=pct_of_l1.tolist(),
+        #     )
 
         # Table 2: neurons correlated with this feature, based on their activations
         if isinstance(corrcoef_neurons, RollingCorrCoef):
@@ -171,15 +171,15 @@ def parse_feature_data(
             )
 
         # Table 4: sae-B features correlated with this feature, based on their activations
-        if isinstance(corrcoef_sae_B, RollingCorrCoef):
-            encB_indices, encB_pearson, encB_cossim = corrcoef_sae_B.topk_pearson(
-                k=layout.feature_tables_cfg.n_rows,
-            )
-            feature_tables_data.update(
-                correlated_b_features_indices=encB_indices,
-                correlated_b_features_pearson=encB_pearson,
-                correlated_b_features_cossim=encB_cossim,
-            )
+        # if isinstance(corrcoef_sae_B, RollingCorrCoef):
+        #     encB_indices, encB_pearson, encB_cossim = corrcoef_sae_B.topk_pearson(
+        #         k=layout.feature_tables_cfg.n_rows,
+        #     )
+        #     feature_tables_data.update(
+        #         correlated_b_features_indices=encB_indices,
+        #         correlated_b_features_pearson=encB_pearson,
+        #         correlated_b_features_cossim=encB_cossim,
+        #     )
 
         # Add all this data to the list of FeatureTablesData objects
         for i, feat in enumerate(feature_indices):
@@ -296,6 +296,7 @@ def parse_feature_data(
     return sae_vis_data, time_logs
 
 
+# TODO: Finish understanding this for later goal
 @torch.inference_mode()
 def _get_feature_data(
     sae: SAE,
@@ -347,9 +348,12 @@ def _get_feature_data(
 
     # ! Data setup code (defining the main objects we'll eventually return, for each of 5 possible vis components)
 
+    # What are the 5 possible vis components?
+
     # Create tensors to store the feature activations & final values of the residual stream
     seqpos_slice = slice(*cfg.seqpos_slice)
     resid_final_hook_name = utils.get_act_name("resid_post", model.cfg.n_layers - 1)
+    # What are the hook names for?
     acts_post_hook_name = f"{sae.cfg.hook_name}.hook_sae_acts_post"
     sae_input_hook_name = f"{sae.cfg.hook_name}.hook_sae_input"
     v_hook_name = utils.get_act_name("v", sae.cfg.hook_layer)
@@ -381,7 +385,10 @@ def _get_feature_data(
     corrcoef_sae_B = RollingCorrCoef() if sae_B is not None else None
 
     # Get sae & decoder directions
+    # dir: direction
     feature_out_dir = sae.W_dec[feature_indices]  # [feats d_sae]
+    # What is the difference between out dir and resid dir?
+    # This is the identity function if the SAE was trained on the residual stream
     feature_resid_dir = to_resid_dir(feature_out_dir, sae, model)  # [feats d_model]
     feature_in_dir = sae.W_enc.T[feature_indices]  # [feats d_in]
     feature_resid_dir_input = to_resid_dir(
@@ -389,6 +396,7 @@ def _get_feature_data(
     )  # [feats d_model]
 
     # ! Compute & concatenate together all feature activations & post-activation function values
+    # What are post-activation function values?
 
     start = 0
     for minibatch in token_minibatches:
@@ -396,13 +404,16 @@ def _get_feature_data(
         t0 = time.monotonic()
 
         sae.use_error_term = True
+        # What does this do?
         _, cache = model.run_with_cache_with_saes(
             minibatch,
             saes=[sae],
             stop_at_layer=model.cfg.n_layers,
             names_filter=list(set(cache_dict.keys()) | {sae_input_hook_name}),
         )
+        # What is the error term?
         sae.use_error_term = False
+
         feat_acts_all = cache[acts_post_hook_name]  # [batch seq d_sae]
         feat_acts = cache[acts_post_hook_name][
             ..., feature_indices
@@ -498,7 +509,7 @@ def get_feature_data(
     cfg: SaeVisConfig,
     sae_B: SAE | None = None,
     linear_probes: list[
-        tuple[Literal["input", "output"], str, Float[Tensor, "d_model d_vocab_out"]]
+        tuple[Literal["input", "output"], str, Float[Tensor, "_Model d_vocab_out"]]
     ] = [],
     target_logits: Float[Tensor, "batch seq d_vocab_out"] | None = None,
     vocab_dict: dict[VocabType, dict[int, str]] | None = None,
@@ -770,8 +781,12 @@ def get_sequences_data(
 
     # ! (4) Compute the logit effect if this feature is ablated
 
+    # Where do we run the rest of the forward pass of the model after doing the ablations?
+    # Is this only defined when the SAE is hooked onto the final residual stream before OV?
+
     # Get this feature's output vector, using an outer product over the feature activations for all tokens
     resid_post_feature_effect = einops.einsum(
+        # These activations are just for this feature
         feat_acts_pre_ablation,
         feature_resid_dir.to(device),
         "n_ex buf, d_model -> n_ex buf d_model",

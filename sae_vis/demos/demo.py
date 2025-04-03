@@ -22,6 +22,26 @@ device = torch.device("cuda")
 
 # %%
 
+
+# Goals:
+# 1. [x] Remove a section of the visualization that I will not use.
+# 2. [x] Remove all sections of the visualization that I will not use.
+# 3. Instead of subtracting feature vector from residual stream for intervention, run forward pass with and without feature zeroed.
+# 4. Compare the visualization before and after (3) for a few features.
+# 5. Import my shallow SAE from my mlsae repo and run the visualization with these changes.
+#   - Ensure that sequence length is correct (SEQ_LEN)
+# 6. Import my deep SAE from my mlsae repo and run the visualization with these changes.
+# 7. Done!
+
+# Goals (2):
+# 1. Add the dependencies to the get_sequences_data function that you need for computing the ablation logit effects.
+#     - Model
+#     - SAE
+# 2. Run the script and make sure it still works.
+# 3. Run the model with the original SAE reconstruction patched in and get the original logits.
+# 4. Run the model with the ablated SAE reconstruction patched in and get the ablated logits.
+# 5. Compute the difference in logits and pass to the rest of the script.
+
 # * [1/5] Feature-centric, vanilla
 # First we run setup code, for loading in the model & SAE as well as the dataset
 
@@ -36,21 +56,12 @@ sae_vis_data = SaeVisData.create(
     sae_B=sae_B,
     model=model,
     tokens=all_tokens[:4096],  # 8192
-    cfg=SaeVisConfig(features=range(128)),  # 256
+    cfg=SaeVisConfig(features=range(16)),  # 256
     verbose=True,
 )
-
 # %%
 
-print("1")
-
-# %%
-
-print("Bla:", sae_vis_data.feature_data_dict.keys())
-print("Bla2", sae_vis_data.feature_data_dict[8])
-
-# %%
-sae_vis_data.save_feature_centric_vis(filename="demo_feature_vis.html", feature=0)
+sae_vis_data.save_feature_centric_vis(filename="demo_feature_vis.html", feature=8)
 
 # %%
 
